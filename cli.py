@@ -73,13 +73,25 @@ def cli():
 @cli.command()
 @click.argument("query")
 @click.option("--top", "-n", default=5, show_default=True, help="Number of results to return.")
-@click.option("--min-score", default=5, show_default=True, help="Minimum similarity % (0-100).")
+@click.option("--min-score", default=3, show_default=True, help="Minimum similarity % (0-100).")
+@click.option("--artist", default="", help="Filter results to a specific artist.")
+@click.option("--movement", default="", help="Filter results by movement keyword.")
+@click.option("--period", default="", help="Filter results by period (exact, e.g. 'Baroque').")
+@click.option("--gender", default="", help="Filter by artist gender (male/female/unknown/non-binary).")
+@click.option("--nationality", default="", help="Filter by artist nationality keyword.")
 @click.option("--verbose", "-v", is_flag=True, help="Show full historical significance text.")
-def search(query: str, top: int, min_score: int, verbose: bool):
+def search(query: str, top: int, min_score: int, artist: str, movement: str,
+           period: str, gender: str, nationality: str, verbose: bool):
     """Search for artworks similar to QUERY (title or artist name)."""
     eng = get_engine()
 
-    result = eng.find_similar(query, top_n=top, min_score=min_score / 100)
+    filters = {k: v for k, v in {
+        "artist": artist, "movement": movement, "period": period,
+        "gender": gender, "nationality": nationality,
+    }.items() if v}
+
+    result = eng.find_similar(query, top_n=top, min_score=min_score / 100,
+                               filters=filters if filters else None)
 
     if result["error"]:
         console.print(f"\n[bold red]Error:[/bold red] {result['error']}\n")
