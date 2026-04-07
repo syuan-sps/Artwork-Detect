@@ -6,7 +6,7 @@ export async function fetchGalleryProfile(query: string): Promise<GalleryResult>
   return response.data;
 }
 
-export async function fetchGalleryList(): Promise<{ name: string; url: string }[]> {
+export async function fetchGalleryList(): Promise<{ name: string; url: string; tier: string }[]> {
   const response = await axios.get('/api/galleries');
   return response.data;
 }

@@ -1,3 +1,9 @@
+export interface Gallery {
+  name: string;
+  url: string;
+  tier: string;
+}
+
 export interface Exhibition {
   title: string;
   artists: string;

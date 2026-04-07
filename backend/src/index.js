@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { findGallery } = require('./galleries');
+const { findGallery, listGalleries } = require('./galleries');
 const { scrapeGallery } = require('./scraper');
 const { synthesizeProfile } = require('./synthesizer');
 
@@ -16,10 +16,11 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/api/galleries', (req, res) => {
-  const { GALLERIES } = require('./galleries');
-  const list = Object.values(GALLERIES)
-    .filter((v, i, arr) => arr.findIndex((x) => x.name === v.name) === i)
-    .map((g) => ({ name: g.name, url: g.url }));
+  const list = listGalleries().map((g) => ({
+    name: g.name,
+    url: g.url,
+    tier: g.tier || 'standard',
+  }));
   res.json(list);
 });
 

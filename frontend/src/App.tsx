@@ -1,15 +1,7 @@
-import React, { useState, FormEvent } from 'react';
+import React, { useState, FormEvent, useEffect, useRef } from 'react';
 import './App.css';
-import { fetchGalleryProfile } from './api';
-import { GalleryResult, Exhibition, CuratorialProfile } from './types';
-
-const GALLERY_SUGGESTIONS = [
-  'David Zwirner',
-  'Paula Cooper Gallery',
-  'Gagosian',
-  'Hauser & Wirth',
-  'Pace Gallery',
-];
+import { fetchGalleryProfile, fetchGalleryList } from './api';
+import { GalleryResult, Exhibition, CuratorialProfile, Gallery } from './types';
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -32,7 +24,6 @@ function ExhibitionTimeline({ exhibitions }: { exhibitions: Exhibition[] }) {
       </div>
     );
   }
-
   return (
     <>
       <div className="exhibition-count-bar">
@@ -43,9 +34,7 @@ function ExhibitionTimeline({ exhibitions }: { exhibitions: Exhibition[] }) {
           <div key={i} className="exhibition-item">
             <div>
               <div className="exhibition-title">{ex.title}</div>
-              {ex.artists && (
-                <div className="exhibition-artists">{ex.artists}</div>
-              )}
+              {ex.artists && <div className="exhibition-artists">{ex.artists}</div>}
             </div>
             <div className="exhibition-right">
               {ex.dates && <div className="exhibition-dates">{ex.dates}</div>}
@@ -61,31 +50,24 @@ function ExhibitionTimeline({ exhibitions }: { exhibitions: Exhibition[] }) {
 function CuratorialSection({ profile }: { profile: CuratorialProfile }) {
   return (
     <>
-      {profile.summary && (
-        <p className="profile-summary">"{profile.summary}"</p>
-      )}
-
+      {profile.summary && <p className="profile-summary">"{profile.summary}"</p>}
       <div className="profile-grid">
         <div className="profile-field">
           <span className="profile-field-label">Primary Mediums</span>
           <TagList items={profile.mediums} />
         </div>
-
         <div className="profile-field">
           <span className="profile-field-label">Movements & Styles</span>
           <TagList items={profile.movements} />
         </div>
-
         <div className="profile-field profile-field-full">
           <span className="profile-field-label">Recurring Themes</span>
           <TagList items={profile.themes} />
         </div>
-
         <div className="profile-field profile-field-full">
           <span className="profile-field-label">Programming Patterns</span>
           <span className="profile-field-value">{profile.programmingPatterns || '—'}</span>
         </div>
-
         {profile.notableStrengths && profile.notableStrengths.length > 0 && (
           <div className="profile-field profile-field-full">
             <span className="profile-field-label">Notable Strengths</span>
@@ -93,7 +75,6 @@ function CuratorialSection({ profile }: { profile: CuratorialProfile }) {
           </div>
         )}
       </div>
-
       <div className="profile-field" style={{ marginBottom: 12 }}>
         <span className="profile-field-label">Artist Demographics</span>
       </div>
@@ -121,11 +102,9 @@ function CuratorialSection({ profile }: { profile: CuratorialProfile }) {
 
 function GalleryCard({ result }: { result: GalleryResult }) {
   const [activeTab, setActiveTab] = useState<'profile' | 'timeline'>('profile');
-
   const scrapedDate = new Date(result.scrapedAt).toLocaleString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
-
   return (
     <div className="gallery-card">
       <div className="gallery-card-header">
@@ -137,7 +116,6 @@ function GalleryCard({ result }: { result: GalleryResult }) {
           <span style={{ marginLeft: 16 }}>Scraped {scrapedDate}</span>
         </div>
       </div>
-
       <div className="card-tabs">
         <button
           className={`card-tab ${activeTab === 'profile' ? 'active' : ''}`}
@@ -152,7 +130,6 @@ function GalleryCard({ result }: { result: GalleryResult }) {
           Exhibition Timeline
         </button>
       </div>
-
       <div className="section-content">
         {activeTab === 'profile' ? (
           <CuratorialSection profile={result.profile} />
@@ -164,6 +141,112 @@ function GalleryCard({ result }: { result: GalleryResult }) {
   );
 }
 
+// ─── Autocomplete Search ──────────────────────────────────────────────────────
+
+function SearchBox({
+  query,
+  setQuery,
+  galleries,
+  loading,
+  onSubmit,
+}: {
+  query: string;
+  setQuery: (q: string) => void;
+  galleries: Gallery[];
+  loading: boolean;
+  onSubmit: (e: FormEvent) => void;
+}) {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [focusedIdx, setFocusedIdx] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const filtered = query.trim().length === 0
+    ? galleries
+    : galleries.filter((g) =>
+        g.name.toLowerCase().includes(query.trim().toLowerCase())
+      );
+
+  const handleSelect = (name: string) => {
+    setQuery(name);
+    setShowDropdown(false);
+    setFocusedIdx(-1);
+    inputRef.current?.focus();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showDropdown) {
+      if (e.key === 'ArrowDown') { setShowDropdown(true); setFocusedIdx(0); }
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      setFocusedIdx((i) => Math.min(i + 1, filtered.length - 1));
+      e.preventDefault();
+    } else if (e.key === 'ArrowUp') {
+      setFocusedIdx((i) => Math.max(i - 1, 0));
+      e.preventDefault();
+    } else if (e.key === 'Enter' && focusedIdx >= 0) {
+      handleSelect(filtered[focusedIdx].name);
+      e.preventDefault();
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
+    }
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+        inputRef.current && !inputRef.current.contains(e.target as Node)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <form onSubmit={onSubmit} style={{ position: 'relative' }}>
+      <div className="search-container">
+        <input
+          ref={inputRef}
+          type="text"
+          className="search-input"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setShowDropdown(true); setFocusedIdx(-1); }}
+          onFocus={() => setShowDropdown(true)}
+          onKeyDown={handleKeyDown}
+          placeholder="Enter a gallery name…"
+          disabled={loading}
+          autoFocus
+          autoComplete="off"
+        />
+        <button type="submit" className="search-button" disabled={loading || !query.trim()}>
+          {loading ? 'Searching…' : 'Profile'}
+        </button>
+      </div>
+
+      {showDropdown && filtered.length > 0 && (
+        <div className="autocomplete-dropdown" ref={dropdownRef}>
+          {filtered.map((g, i) => (
+            <div
+              key={g.name}
+              className={`autocomplete-item ${i === focusedIdx ? 'focused' : ''} ${g.tier === 'featured' ? 'featured' : ''}`}
+              onMouseDown={() => handleSelect(g.name)}
+              onMouseEnter={() => setFocusedIdx(i)}
+            >
+              <span className="autocomplete-name">{g.name}</span>
+              {g.tier === 'featured' && <span className="autocomplete-badge">Featured</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </form>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -172,20 +255,27 @@ export default function App() {
   const [loadingStep, setLoadingStep] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<GalleryResult | null>(null);
+  const [galleries, setGalleries] = useState<Gallery[]>([]);
+
+  useEffect(() => {
+    fetchGalleryList()
+      .then((list) => setGalleries(list.sort((a, b) => a.name.localeCompare(b.name))))
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!query.trim() || loading) return;
-
     setLoading(true);
     setError(null);
     setResult(null);
     setLoadingStep('Fetching exhibition data…');
-
     try {
-      setTimeout(() => setLoadingStep('Scraping gallery website…'), 2000);
-      setTimeout(() => setLoadingStep('Synthesizing curatorial profile with AI…'), 5000);
+      const t1 = setTimeout(() => setLoadingStep('Scraping gallery website…'), 2000);
+      const t2 = setTimeout(() => setLoadingStep('Synthesizing curatorial profile with AI…'), 6000);
       const data = await fetchGalleryProfile(query.trim());
+      clearTimeout(t1);
+      clearTimeout(t2);
       setResult(data);
     } catch (err: any) {
       const msg = err?.response?.data?.error || err.message || 'An error occurred';
@@ -196,10 +286,6 @@ export default function App() {
     }
   };
 
-  const handleSuggestionClick = (name: string) => {
-    setQuery(name);
-  };
-
   return (
     <div className="app">
       <header className="app-header">
@@ -208,31 +294,16 @@ export default function App() {
       </header>
 
       <main className="app-main">
-        <form onSubmit={handleSubmit}>
-          <div className="search-container">
-            <input
-              type="text"
-              className="search-input"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Enter a gallery name…"
-              disabled={loading}
-              autoFocus
-            />
-            <button type="submit" className="search-button" disabled={loading || !query.trim()}>
-              {loading ? 'Searching…' : 'Profile'}
-            </button>
-          </div>
-        </form>
+        <SearchBox
+          query={query}
+          setQuery={setQuery}
+          galleries={galleries}
+          loading={loading}
+          onSubmit={handleSubmit}
+        />
 
         <p className="gallery-hints">
-          Try:{' '}
-          {GALLERY_SUGGESTIONS.map((name, i) => (
-            <React.Fragment key={name}>
-              <span onClick={() => handleSuggestionClick(name)}>{name}</span>
-              {i < GALLERY_SUGGESTIONS.length - 1 ? ', ' : ''}
-            </React.Fragment>
-          ))}
+          {galleries.length > 0 ? `${galleries.length} galleries indexed` : 'Loading galleries…'}
         </p>
 
         {loading && (

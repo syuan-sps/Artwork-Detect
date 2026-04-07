@@ -425,37 +425,146 @@ async function scrapeHauserWirth() {
   return exhibitions;
 }
 
-// ─── Universal fallback ───────────────────────────────────────────────────────
+// ─── Universal scraper (works for ~90% of gallery sites) ─────────────────────
 
+/**
+ * Strategy:
+ * 1. Try /exhibitions path, then /gallery-exhibitions, /shows, /program
+ * 2. Collect all <a> tags with href containing "exhibition" or "show"
+ * 3. Filter out nav/footer links by text length
+ * 4. Parse date + title from each link text
+ * 5. Fall back to heading-level text extraction if no links found
+ */
 async function scrapeUniversal(galleryConfig) {
   const exhibitions = [];
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
     await page.setUserAgent(UA);
-    const url = `${galleryConfig.url}${galleryConfig.exhibitionsPath}`;
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    const raw = await page.evaluate(() => {
-      const items = [];
-      document.querySelectorAll('a[href*="exhibition"], a[href*="show"]').forEach((el) => {
-        const href = el.href;
-        const text = el.textContent.trim().replace(/\s+/g, ' ');
-        if (text.length > 10 && text.length < 500) {
-          items.push({ href, text });
+    const pathsToTry = [
+      galleryConfig.exhibitionsPath,
+      '/exhibitions',
+      '/gallery-exhibitions',
+      '/shows',
+      '/program',
+      '/current',
+      '/exhibitions/past',
+    ];
+
+    let raw = [];
+    for (const path of pathsToTry) {
+      const url = `${galleryConfig.url}${path}`;
+      try {
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+
+        // Strategy 1: links to individual exhibition pages
+        raw = await page.evaluate(() => {
+          const items = [];
+          document
+            .querySelectorAll('a[href*="exhibition"], a[href*="show"], a[href*="program"]')
+            .forEach((el) => {
+              const href = el.href;
+              const text = el.textContent.trim().replace(/\s+/g, ' ');
+              if (
+                text.length > 12 &&
+                text.length < 600 &&
+                !text.match(/^(Exhibitions|Gallery|Artists|Archive|Filter|Past|Current|Upcoming|View All|Skip to|Accept|Museum|Public|Shows?|Program|Online Viewing Room|\d{4}[-–]\d{4})$/i)
+              ) {
+                items.push({ href, text });
+              }
+            });
+          return [...new Map(items.map((i) => [i.href, i])).values()].slice(0, 40);
+        });
+
+        // Strategy 2: exhibition cards / structured containers on the same page
+        if (raw.length < 3) {
+          const cardData = await page.evaluate(() => {
+            const items = [];
+            // Look for containers that have both an artist name and a date
+            const candidates = document.querySelectorAll(
+              'article, [class*="exhibition"], [class*="show"], [class*="item"], [class*="card"], [class*="listing"], li'
+            );
+            candidates.forEach((el) => {
+              const text = el.textContent.trim().replace(/\s+/g, ' ');
+              // Must contain a date-like pattern and be substantial
+              if (
+                text.length > 20 &&
+                text.length < 500 &&
+                text.match(/\d{4}/) &&
+                !text.match(/^(Exhibitions|Artists|Archive|Filter|Past|Current|Upcoming)$/i)
+              ) {
+                // Use only the direct text, not nested containers (avoid duplicates)
+                const directText = [...el.childNodes]
+                  .map((n) => n.textContent?.trim() || '')
+                  .filter(Boolean)
+                  .join(' ')
+                  .replace(/\s+/g, ' ')
+                  .slice(0, 300);
+                if (directText.length > 15) {
+                  items.push({ href: el.querySelector('a')?.href || '', text: directText });
+                }
+              }
+            });
+            // Deduplicate by first 40 chars
+            const seen = new Set();
+            return items.filter((i) => {
+              const key = i.text.slice(0, 40);
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            }).slice(0, 40);
+          });
+          if (cardData.length > raw.length) raw = cardData;
         }
+
+        if (raw.length > 0) break;
+      } catch (_) {}
+    }
+
+    // If still nothing, scrape headings
+    if (raw.length === 0) {
+      const headingData = await page.evaluate(() => {
+        return [...document.querySelectorAll('h1, h2, h3')]
+          .map((h) => h.textContent.trim().replace(/\s+/g, ' '))
+          .filter((t) => t.length > 5 && t.length < 200)
+          .slice(0, 20)
+          .map((text) => ({ href: '', text }));
       });
-      return [...new Map(items.map((i) => [i.href, i])).values()].slice(0, 30);
-    });
+      raw = headingData;
+    }
 
     for (const item of raw) {
-      const dateMatch = item.text.match(
-        /([A-Z][a-z]+ \d{1,2}(?:,?\s*\d{4})?[\s–\-—]+[A-Z][a-z]+ \d{1,2},?\s*\d{4})/
-      );
+      const text = item.text;
+      const slug = (item.href || '').split('/').filter(Boolean).pop() || '';
+
+      // Date range — also handles "through April 25, 2026" (single endpoint)
+      const dateMatch =
+        text.match(
+          /([A-Z][a-z]{1,8}\.?\s+\d{1,2}(?:,?\s*\d{4})?[\s–\-—]+[A-Z][a-z]{1,8}\.?\s+\d{1,2},?\s*\d{4})/
+        ) ||
+        text.match(/((?:through|Through|thru)\s+[A-Z][a-z]{1,8}\.?\s+\d{1,2},?\s*\d{4})/) ||
+        text.match(/([A-Z][a-z]{1,8}\.?\s+\d{1,2},?\s*\d{4}\s*–\s*[A-Z][a-z]{1,8}\.?\s+\d{1,2},?\s*\d{4})/);
       const dates = dateMatch ? dateMatch[0] : '';
-      const title = item.text.replace(dates, '').trim();
-      if (title.length > 3) {
-        exhibitions.push({ title, artists: '', dates, location: '' });
+      const withoutDates = text.replace(dates, '').trim();
+
+      // Known location patterns
+      const locationMatch = withoutDates.match(
+        /(New York|Los Angeles|London|Paris|Hong Kong|Berlin|Seoul|Zürich|Zurich|Chelsea|Chelsea, NY|West \d+[a-z]* Street|\d+ (?:West|East) [\w\s]+Street)\s*(?:,\s*)?/i
+      );
+      const location = locationMatch ? locationMatch[1].trim() : '';
+      const titleBlock = withoutDates.replace(locationMatch ? locationMatch[0] : '', '').trim();
+
+      // Try artist/title split using slug
+      const { artist, title } = splitArtistTitle(titleBlock, slug);
+
+      if (title || titleBlock) {
+        exhibitions.push({
+          title: title || titleBlock,
+          artists: artist,
+          dates,
+          location,
+        });
       }
     }
   } catch (err) {
@@ -472,6 +581,7 @@ async function scrapeGallery(galleryConfig) {
   const name = galleryConfig.name.toLowerCase();
   let exhibitions = [];
 
+  // Featured gallery custom scrapers
   if (name.includes('zwirner')) {
     exhibitions = await scrapeDavidZwirner();
   } else if (name.includes('paula cooper')) {
@@ -480,10 +590,11 @@ async function scrapeGallery(galleryConfig) {
     exhibitions = await scrapeGagosian();
   } else if (name.includes('hauser')) {
     exhibitions = await scrapeHauserWirth();
-  } else if (name.includes('pace')) {
+  } else if (name.includes('pace gallery') || name === 'pace') {
     exhibitions = await scrapePaceGallery();
   }
 
+  // All standard galleries use the universal scraper
   if (exhibitions.length === 0) {
     exhibitions = await scrapeUniversal(galleryConfig);
   }
