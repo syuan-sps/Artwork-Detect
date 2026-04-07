@@ -2,7 +2,7 @@
 
 Live curatorial intelligence for contemporary art galleries. Enter a gallery name to get a structured profile — exhibition history + AI-synthesized curatorial analysis — scraped fresh from the gallery's own website.
 
-## 167 Galleries Indexed
+## 234 Galleries Indexed
 
 ### Featured (custom scrapers)
 - David Zwirner · Paula Cooper Gallery · Gagosian · Hauser & Wirth · Pace Gallery
