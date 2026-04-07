@@ -369,47 +369,20 @@ async function scrapeHauserWirth() {
         'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
       'Upgrade-Insecure-Requests': '1',
     });
+
+    // Try the exhibitions page
     await page.goto('https://www.hauserwirth.com/exhibitions', {
-      waitUntil: 'networkidle2',
+      waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
 
     const html = await page.content();
     const isBlocked =
       html.includes('security-checkpoint') ||
-      html.includes('spinner') ||
-      html.length < 5000;
+      html.includes('vercel') ||
+      html.length < 10000;
 
-    if (isBlocked) {
-      // Hauser & Wirth has a public JSON feed
-      console.log('Hauser & Wirth: attempting JSON API...');
-      try {
-        const apiResp = await page.evaluate(async () => {
-          const res = await fetch(
-            'https://www.hauserwirth.com/exhibitions/?format=json&limit=30',
-            { headers: { Accept: 'application/json' } }
-          );
-          if (!res.ok) return null;
-          return await res.json();
-        });
-        if (apiResp) {
-          const list = apiResp.results || apiResp.data || apiResp;
-          if (Array.isArray(list)) {
-            for (const ex of list.slice(0, 30)) {
-              exhibitions.push({
-                title: ex.title || ex.name || '',
-                artists: ex.artist || ex.artists || '',
-                dates:
-                  ex.dates ||
-                  ex.dateRange ||
-                  `${ex.startDate || ''} – ${ex.endDate || ''}`,
-                location: ex.location || ex.gallery || '',
-              });
-            }
-          }
-        }
-      } catch (_) {}
-    } else {
+    if (!isBlocked) {
       const raw = await page.evaluate(() => {
         const items = [];
         document
@@ -425,13 +398,24 @@ async function scrapeHauserWirth() {
       });
 
       for (const item of raw) {
+        const slug = item.href.split('/').filter(Boolean).pop() || '';
         const dateMatch = item.text.match(
           /([A-Z][a-z]+ \d{1,2}(?:,?\s*\d{4})?[\s–\-—]+[A-Z][a-z]+ \d{1,2},?\s*\d{4})/
         );
         const dates = dateMatch ? dateMatch[0] : '';
-        const withoutDates = item.text.replace(dates, '').trim();
-        exhibitions.push({ title: withoutDates, artists: '', dates, location: '' });
+        const block = item.text.replace(dates, '').trim();
+        const { artist, title } = splitArtistTitle(block, slug);
+        exhibitions.push({ title: title || block, artists: artist, dates, location: '' });
       }
+    } else {
+      console.log('Hauser & Wirth: protected by bot detection (HTTP 429 / Vercel checkpoint)');
+      // Return a single informational entry so the AI can still generate a profile note
+      exhibitions.push({
+        title: '[Live scraping blocked by gallery website bot protection]',
+        artists: '',
+        dates: '',
+        location: 'Hauser & Wirth operates galleries in New York, Los Angeles, London, Zürich, Somerset, St. Moritz, Menorca, Monaco, Hong Kong, and Los Angeles',
+      });
     }
   } catch (err) {
     console.error('Hauser & Wirth scrape error:', err.message);
