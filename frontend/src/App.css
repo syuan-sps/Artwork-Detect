@@ -1,0 +1,446 @@
+/* ─── Reset & Base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --color-bg: #fafafa;
+  --color-surface: #ffffff;
+  --color-border: #e0e0e0;
+  --color-border-light: #f0f0f0;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #555555;
+  --color-text-muted: #888888;
+  --color-accent: #1a1a1a;
+  --color-accent-hover: #333333;
+  --color-tag-bg: #f5f5f5;
+  --color-tag-text: #444444;
+  --font-serif: 'EB Garamond', 'Georgia', 'Times New Roman', serif;
+  --font-sans: 'Helvetica Neue', 'Arial', sans-serif;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  --shadow-card-hover: 0 2px 8px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.06);
+  --radius: 2px;
+}
+
+html, body {
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Layout ────────────────────────────────────────────────────────────────── */
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  padding: 48px 24px 0;
+  text-align: center;
+}
+
+.app-title {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: normal;
+  letter-spacing: 0.04em;
+  color: var(--color-text-primary);
+  margin-bottom: 6px;
+}
+
+.app-subtitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-main {
+  flex: 1;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  width: 100%;
+}
+
+/* ─── Search ────────────────────────────────────────────────────────────────── */
+.search-container {
+  display: flex;
+  gap: 0;
+  margin-bottom: 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 16px 20px;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  color: var(--color-text-primary);
+  background: transparent;
+}
+
+.search-input::placeholder {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.search-button {
+  border: none;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-accent);
+  color: white;
+  padding: 16px 28px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.search-button:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.search-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gallery-hints {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+  letter-spacing: 0.03em;
+}
+
+.gallery-hints span {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 0.15s;
+}
+
+.gallery-hints span:hover {
+  text-decoration-color: var(--color-text-muted);
+}
+
+/* ─── States ─────────────────────────────────────────────────────────────────── */
+.loading-state {
+  text-align: center;
+  padding: 80px 0;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-label {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.loading-steps {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 8px;
+}
+
+.error-state {
+  background: var(--color-surface);
+  border: 1px solid #e8d5d5;
+  padding: 24px;
+  text-align: center;
+}
+
+.error-state p {
+  color: #c0392b;
+  font-size: 14px;
+}
+
+/* ─── Gallery Card ───────────────────────────────────────────────────────────── */
+.gallery-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+  margin-top: 40px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.gallery-card-header {
+  padding: 32px 40px 24px;
+  border-bottom: 1px solid var(--color-border-light);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gallery-card-name {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: normal;
+  letter-spacing: 0.02em;
+}
+
+.gallery-card-meta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+}
+
+.gallery-card-meta a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 0.15s;
+}
+
+.gallery-card-meta a:hover {
+  text-decoration-color: var(--color-text-muted);
+}
+
+/* ─── Section Tabs ───────────────────────────────────────────────────────────── */
+.card-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 40px;
+}
+
+.card-tab {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: 14px 0;
+  margin-right: 32px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-family: var(--font-sans);
+}
+
+.card-tab:hover {
+  color: var(--color-text-primary);
+}
+
+.card-tab.active {
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-accent);
+}
+
+/* ─── Curatorial Profile Section ─────────────────────────────────────────────── */
+.section-content {
+  padding: 32px 40px;
+}
+
+.profile-summary {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  line-height: 1.75;
+  color: var(--color-text-primary);
+  margin-bottom: 32px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--color-border-light);
+  font-style: italic;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 600px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+  .section-content {
+    padding: 24px 20px;
+  }
+  .gallery-card-header {
+    padding: 24px 20px 16px;
+  }
+  .card-tabs {
+    padding: 0 20px;
+  }
+}
+
+.profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-field-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.profile-field-value {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  display: inline-block;
+  background: var(--color-tag-bg);
+  color: var(--color-tag-text);
+  font-size: 12px;
+  padding: 3px 10px;
+  letter-spacing: 0.02em;
+}
+
+.profile-field-full {
+  grid-column: 1 / -1;
+}
+
+/* ─── Artist Profile Sub-section ─────────────────────────────────────────────── */
+.artist-profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-light);
+  padding: 20px 24px;
+  margin-top: 4px;
+}
+
+@media (max-width: 600px) {
+  .artist-profile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.artist-profile-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.artist-profile-item .profile-field-label {
+  font-size: 9px;
+}
+
+/* ─── Exhibition Timeline ─────────────────────────────────────────────────────── */
+.exhibition-count-bar {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 20px;
+  letter-spacing: 0.04em;
+}
+
+.exhibition-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.exhibition-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px 24px;
+  align-items: start;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-border-light);
+  transition: background 0.1s;
+}
+
+.exhibition-item:last-child {
+  border-bottom: none;
+}
+
+.exhibition-title {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+.exhibition-artists {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-top: 3px;
+}
+
+.exhibition-right {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.exhibition-dates {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.exhibition-location {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+  letter-spacing: 0.02em;
+}
+
+.empty-state {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-style: italic;
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────────────── */
+.app-footer {
+  text-align: center;
+  padding: 24px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+  border-top: 1px solid var(--color-border-light);
+}
