@@ -16,6 +16,37 @@ function TagList({ items }: { items: string[] }) {
   );
 }
 
+const STATUS_COLORS: Record<string, string> = {
+  current: '#1a7a4a',
+  upcoming: '#1a4a7a',
+  past: '#888',
+  unknown: 'transparent',
+};
+
+function ExhibitionGroup({ label, exhibitions, color }: { label: string; exhibitions: Exhibition[]; color: string }) {
+  if (exhibitions.length === 0) return null;
+  return (
+    <div className="exhibition-group">
+      <div className="exhibition-group-header" style={{ color }}>
+        <span className="exhibition-group-dot" style={{ background: color }} />
+        {label} <span className="exhibition-group-count">({exhibitions.length})</span>
+      </div>
+      {exhibitions.map((ex, i) => (
+        <div key={i} className="exhibition-item">
+          <div>
+            <div className="exhibition-title">{ex.title}</div>
+            {ex.artists && <div className="exhibition-artists">{ex.artists}</div>}
+          </div>
+          <div className="exhibition-right">
+            {ex.dates && <div className="exhibition-dates">{ex.dates}</div>}
+            {ex.location && <div className="exhibition-location">{ex.location}</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ExhibitionTimeline({ exhibitions }: { exhibitions: Exhibition[] }) {
   if (!exhibitions || exhibitions.length === 0) {
     return (
@@ -24,33 +55,73 @@ function ExhibitionTimeline({ exhibitions }: { exhibitions: Exhibition[] }) {
       </div>
     );
   }
+
+  const current = exhibitions.filter(e => e.status === 'current');
+  const upcoming = exhibitions.filter(e => e.status === 'upcoming');
+  const past = exhibitions.filter(e => e.status === 'past');
+  const unknown = exhibitions.filter(e => e.status === 'unknown');
+
   return (
     <>
       <div className="exhibition-count-bar">
         {exhibitions.length} exhibition{exhibitions.length !== 1 ? 's' : ''} retrieved
+        {current.length > 0 && <span className="timeline-badge timeline-badge-current">{current.length} on view</span>}
+        {upcoming.length > 0 && <span className="timeline-badge timeline-badge-upcoming">{upcoming.length} upcoming</span>}
+        {past.length > 0 && <span className="timeline-badge timeline-badge-past">{past.length} past</span>}
       </div>
-      <div className="exhibition-list">
-        {exhibitions.map((ex, i) => (
-          <div key={i} className="exhibition-item">
-            <div>
-              <div className="exhibition-title">{ex.title}</div>
-              {ex.artists && <div className="exhibition-artists">{ex.artists}</div>}
-            </div>
-            <div className="exhibition-right">
-              {ex.dates && <div className="exhibition-dates">{ex.dates}</div>}
-              {ex.location && <div className="exhibition-location">{ex.location}</div>}
-            </div>
-          </div>
-        ))}
-      </div>
+      <ExhibitionGroup label="On View Now" exhibitions={current} color={STATUS_COLORS.current} />
+      <ExhibitionGroup label="Upcoming" exhibitions={upcoming} color={STATUS_COLORS.upcoming} />
+      <ExhibitionGroup label="Past" exhibitions={past} color={STATUS_COLORS.past} />
+      {unknown.length > 0 && (
+        <ExhibitionGroup label="Date Unknown" exhibitions={unknown} color={STATUS_COLORS.unknown} />
+      )}
     </>
   );
 }
 
+function TemporalBlock({ label, text, accent }: { label: string; text: string; accent: string }) {
+  if (!text || text.includes('ANTHROPIC_API_KEY')) return null;
+  return (
+    <div className="temporal-block" style={{ borderLeftColor: accent }}>
+      <div className="temporal-label" style={{ color: accent }}>{label}</div>
+      <div className="temporal-text">{text}</div>
+    </div>
+  );
+}
+
 function CuratorialSection({ profile }: { profile: CuratorialProfile }) {
+  const hasTemporalData = profile.pastTrends || profile.currentHighlights || profile.upcomingChoices;
+
   return (
     <>
       {profile.summary && <p className="profile-summary">"{profile.summary}"</p>}
+
+      {hasTemporalData && (
+        <div className="temporal-section">
+          <TemporalBlock
+            label="Past — What choices did they make?"
+            text={profile.pastTrends}
+            accent="#888"
+          />
+          <TemporalBlock
+            label="Now — What is open today?"
+            text={profile.currentHighlights}
+            accent="#1a7a4a"
+          />
+          <TemporalBlock
+            label="Next — Where are they heading?"
+            text={profile.upcomingChoices}
+            accent="#1a4a7a"
+          />
+          {profile.strategicTakeaway && (
+            <div className="strategic-takeaway">
+              <span className="strategic-label">Strategic read</span>
+              <span className="strategic-text">{profile.strategicTakeaway}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="profile-grid">
         <div className="profile-field">
           <span className="profile-field-label">Primary Mediums</span>
@@ -75,6 +146,7 @@ function CuratorialSection({ profile }: { profile: CuratorialProfile }) {
           </div>
         )}
       </div>
+
       <div className="profile-field" style={{ marginBottom: 12 }}>
         <span className="profile-field-label">Artist Demographics</span>
       </div>

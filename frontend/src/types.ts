@@ -9,6 +9,7 @@ export interface Exhibition {
   artists: string;
   dates: string;
   location: string;
+  status: 'past' | 'current' | 'upcoming' | 'unknown';
 }
 
 export interface ArtistProfile {
@@ -20,6 +21,10 @@ export interface ArtistProfile {
 
 export interface CuratorialProfile {
   summary: string;
+  pastTrends: string;
+  currentHighlights: string;
+  upcomingChoices: string;
+  strategicTakeaway: string;
   mediums: string[];
   themes: string[];
   movements: string[];

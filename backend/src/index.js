@@ -4,6 +4,7 @@ const cors = require('cors');
 const { findGallery, listGalleries } = require('./galleries');
 const { scrapeGallery } = require('./scraper');
 const { synthesizeProfile } = require('./synthesizer');
+const { classifyExhibitions } = require('./temporal');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -39,8 +40,14 @@ app.post('/api/profile', async (req, res) => {
 
   try {
     console.log(`[${new Date().toISOString()}] Scraping ${gallery.name}...`);
-    const exhibitions = await scrapeGallery(gallery);
-    console.log(`[${new Date().toISOString()}] Got ${exhibitions.length} exhibitions, synthesizing...`);
+    const raw = await scrapeGallery(gallery);
+    const exhibitions = classifyExhibitions(raw);
+    console.log(
+      `[${new Date().toISOString()}] Got ${exhibitions.length} exhibitions ` +
+      `(${exhibitions.filter(e => e.status === 'past').length} past, ` +
+      `${exhibitions.filter(e => e.status === 'current').length} current, ` +
+      `${exhibitions.filter(e => e.status === 'upcoming').length} upcoming), synthesizing...`
+    );
 
     const profile = await synthesizeProfile(gallery.name, exhibitions);
 

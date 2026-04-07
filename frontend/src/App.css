@@ -390,6 +390,123 @@ html, body {
   grid-column: 1 / -1;
 }
 
+/* ─── Temporal Analysis Section ─────────────────────────────────────────────── */
+.temporal-section {
+  margin-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--color-border-light);
+}
+
+.temporal-block {
+  padding: 16px 20px;
+  border-left: 3px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-light);
+  background: var(--color-bg);
+}
+
+.temporal-block:last-of-type {
+  border-bottom: none;
+}
+
+.temporal-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.temporal-text {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+
+.strategic-takeaway {
+  padding: 14px 20px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border-light);
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.strategic-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.strategic-text {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-style: italic;
+  color: var(--color-text-primary);
+  line-height: 1.6;
+}
+
+/* ─── Exhibition Group ───────────────────────────────────────────────────────── */
+.exhibition-group {
+  margin-bottom: 24px;
+}
+
+.exhibition-group:last-child {
+  margin-bottom: 0;
+}
+
+.exhibition-group-header {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.exhibition-group-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.exhibition-group-count {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.timeline-badge {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  margin-left: 8px;
+  border-radius: 2px;
+}
+
+.timeline-badge-current {
+  background: #e6f4ec;
+  color: #1a7a4a;
+}
+
+.timeline-badge-upcoming {
+  background: #e6eef4;
+  color: #1a4a7a;
+}
+
+.timeline-badge-past {
+  background: #f0f0f0;
+  color: #888;
+}
+
 /* ─── Artist Profile Sub-section ─────────────────────────────────────────────── */
 .artist-profile-grid {
   display: grid;
