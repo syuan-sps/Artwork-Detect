@@ -15,52 +15,100 @@ function normalize(s) {
 }
 
 /**
- * Given combined "ArtistNameExhibition Title" text (adjacent DOM nodes merged without separator),
- * use the URL slug to find the correct artist/title split.
+ * Given combined "ArtistTitleText" (DOM nodes merged without separator),
+ * use the URL slug to find the correct artist / title split.
  *
- * The Gagosian DOM has e.g.:
- *   text: "Jasper JohnsBetween the Clock and the Bed"
- *   slug: "jasper-johns-between-the-clock-and-the-bed"
- *
- * Strategy: find CamelCase boundaries in the text (uppercase after lowercase, no space),
- * check if the artist prefix normalizes to the start of the slug AND the title prefix
- * matches the remainder.
+ * Scoring heuristic: among all valid slug-word-boundary splits, prefer:
+ *   1. Splits where the title starts with uppercase (clear camelCase join)
+ *   2. Splits where the artist ends at a space (clean word boundary)
+ *   3. The longest matching split (most specific artist identification)
  */
 function splitArtistTitle(combined, slug) {
   if (!combined || !slug) return { artist: '', title: combined || '' };
 
   const slugNorm = normalize(slug);
 
-  // Find CamelCase split points
-  const splitPoints = [];
-  for (let i = 1; i < combined.length; i++) {
-    if (
-      combined[i] >= 'A' &&
-      combined[i] <= 'Z' &&
-      combined[i - 1] !== ' ' &&
-      combined[i - 1] >= 'a' &&
-      combined[i - 1] <= 'z'
-    ) {
-      splitPoints.push(i);
-    }
+  // normToRaw: for each normalized char index, its raw text position
+  const normToRaw = [];
+  for (let i = 0; i < combined.length; i++) {
+    if (/[a-z0-9]/i.test(combined[i])) normToRaw.push(i);
   }
 
-  // For each split, verify artist norm matches slug start AND title norm matches remainder
-  for (const sp of splitPoints) {
-    const artist = combined.slice(0, sp).trim();
-    const title = combined.slice(sp).trim();
+  // Slug word boundaries (cumulative normalized lengths, including full slug end)
+  const slugSegments = slug.split('-');
+  const boundaries = [];
+  let cumLen = 0;
+  for (const seg of slugSegments) {
+    cumLen += normalize(seg).length;
+    boundaries.push(cumLen);
+  }
+
+  const validSplits = [];
+
+  for (const boundary of boundaries) {
+    if (boundary === 0 || boundary > normToRaw.length) continue;
+
+    const rawEnd = normToRaw[boundary - 1];
+    if (normalize(combined.slice(0, rawEnd + 1)) !== slugNorm.slice(0, boundary)) continue;
+
+    const splitPos = rawEnd + 1;
+    const artist = combined.slice(0, splitPos).trim();
+    const title = combined.slice(splitPos).trim();
     if (!artist || !title) continue;
-    const artistNorm = normalize(artist);
-    if (!slugNorm.startsWith(artistNorm) || artistNorm.length < 3) continue;
-    const remainingSlug = slugNorm.slice(artistNorm.length);
-    const titleNorm = normalize(title);
-    // Require first 3 chars of title to match remainder of slug
-    if (remainingSlug.length > 0 && titleNorm.slice(0, 3) === remainingSlug.slice(0, 3)) {
-      return { artist, title };
+
+    // Verify title starts with what the slug says comes next
+    const remainSlug = slugNorm.slice(boundary);
+    if (remainSlug.length >= 3) {
+      // Normalize title, but also handle non-ASCII by stripping accents
+      const titleNorm = normalize(title.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+      const chk = Math.min(4, remainSlug.length);
+      if (titleNorm.slice(0, chk) !== remainSlug.slice(0, chk)) continue;
     }
+
+    const titleFirstChar = combined[splitPos] || '';
+    const artistLastChar = combined[splitPos - 1] || '';
+    // Score: title starting uppercase + artist ending at space = best split
+    const score =
+      (titleFirstChar >= 'A' && titleFirstChar <= 'Z' ? 2 : 0) +
+      (artistLastChar === ' ' ? 1 : 0);
+
+    validSplits.push({ artist, title, boundary, score });
   }
 
-  return { artist: '', title: combined };
+  if (validSplits.length === 0) return { artist: '', title: combined };
+
+  // Sort: highest score first, then longest boundary (most artist words identified)
+  validSplits.sort((a, b) => b.score - a.score || b.boundary - a.boundary);
+  return { artist: validSplits[0].artist, title: validSplits[0].title };
+}
+
+/**
+ * For David Zwirner links the text format is:
+ *   "ArtistTitleLocation(Now Open|Coming Soon|Opening DATE): DateLearn More"
+ * This function strips all trailing noise and extracts artist, title, dates, location.
+ */
+function parseDavidZwirnerLink(rawText, slug) {
+  // Strip "Learn More" at end
+  let text = rawText.replace(/Learn More\s*$/i, '').trim();
+
+  // Strip status + date suffix: "Now Open: DATE", "Coming Soon: DATE", "Opening DATE:"
+  // Keep everything before the status marker
+  const statusIdx = text.search(/(Now Open|Coming Soon|Opening [A-Z][a-z])[:\s]/i);
+  let beforeStatus = statusIdx > 0 ? text.slice(0, statusIdx).trim() : text;
+
+  // Extract date range from the full text (it may appear after status)
+  const dateMatch = text.match(/([A-Z][a-z]+ \d{1,2}[—–\-][A-Z]?[a-z]* ?\d{1,2},?\s*\d{4})/);
+  const dates = dateMatch ? dateMatch[1] : '';
+
+  // Location at end of beforeStatus — known city/address patterns
+  const locationMatch = beforeStatus.match(
+    /(New York(?:[:\s]*(?:19th|20th|Walker|69th|21st|25th)[^\w]*Street)?|Los Angeles|London|Paris|Hong Kong|Berlin|Seoul|Brussels)\s*$/i
+  );
+  const location = locationMatch ? locationMatch[1].replace(/\s+/g, ' ').trim() : '';
+  const titleBlock = beforeStatus.replace(locationMatch ? locationMatch[0] : '', '').trim();
+
+  const { artist, title } = splitArtistTitle(titleBlock, slug);
+  return { artist, title: title || titleBlock, dates, location };
 }
 
 /**
@@ -109,34 +157,9 @@ async function scrapeDavidZwirner() {
     });
 
     for (const item of raw) {
-      const raw_text = item.text;
       const slug = item.href.split('/').pop() || '';
-
-      // Format: "ArtistTitleLocation(Now Open|Coming Soon|Opening DATE): DateLearn More"
-      // 1. Strip "Learn More" at end
-      const stripped = raw_text.replace(/Learn More\s*$/i, '').trim();
-
-      // 2. Extract date range (comes after status label like "Now Open:")
-      const dateMatch = stripped.match(
-        /([A-Z][a-z]+ \d{1,2}[—–\-][A-Z]?[a-z]* ?\d{1,2},?\s*\d{4})/
-      );
-      const dates = dateMatch ? dateMatch[1] : '';
-
-      // 3. Remove everything from "Now Open:" / "Coming Soon:" / "Opening DATE:" onwards
-      const statusIdx = stripped.search(/(Now Open|Coming Soon|Opening [A-Z])[:\s]/i);
-      const textBlock = statusIdx > 0 ? stripped.slice(0, statusIdx).trim() : stripped.replace(dates, '').trim();
-
-      // 4. Extract location — known cities / address patterns at end of textBlock
-      const locationMatch = textBlock.match(
-        /(New York(?:[:\s]*(?:19th|20th|Walker|69th|21st)[^\w]*Street)?|Los Angeles|London|Paris|Hong Kong|Berlin|Seoul)\s*$/i
-      );
-      const location = locationMatch ? locationMatch[1].replace(/\s+/g, ' ').trim() : '';
-      const titleBlock = textBlock.replace(locationMatch ? locationMatch[0] : '', '').trim();
-
-      // 5. Split artist from title using slug
-      const { artist, title } = splitArtistTitle(titleBlock, slug);
-
-      exhibitions.push({ title: title || titleBlock, artists: artist, dates, location });
+      const { artist, title, dates, location } = parseDavidZwirnerLink(item.text, slug);
+      if (title) exhibitions.push({ title, artists: artist, dates, location });
     }
   } catch (err) {
     console.error('David Zwirner scrape error:', err.message);
@@ -259,18 +282,44 @@ async function scrapePaulaCooper() {
         const dates = dateMatch ? dateMatch[0] : '';
         const withoutDates = text.replace(dates, '').trim();
 
-        // Street address
+        // Street address — remove so it doesn't pollute the title
         const locationMatch = withoutDates.match(
-          /(\d+\s+(?:West|East|North|South)\s+[\w\s]+(?:Street|Avenue|Ave|St))/i
+          /(\d+\s+(?:West|East|North|South)\s+[\w\s]+(?:Street|Avenue|Ave|St)|(?:534|521|529|314)\s+(?:West|East)[\s\w]+|Lever House[^,]*)/i
         );
         const location = locationMatch ? locationMatch[1].trim() : '';
-        const withoutLocation = withoutDates.replace(location, '').trim();
+        const withoutLocation = withoutDates.replace(locationMatch ? locationMatch[0] : '', '').trim();
 
-        const { artist, title } = splitArtistTitle(withoutLocation, slug);
+        // Paula Cooper slugs are usually just artist-name (e.g. "ralph-lemon", "sol-lewitt5")
+        // Try slug-based split; if the entire text normalizes to the artist slug, treat as artist-only show
+        const slugBase = slug.replace(/\d+$/, ''); // strip trailing version numbers
+        const { artist, title } = splitArtistTitle(withoutLocation, slugBase);
+
+        // If artist captured and title is left, great. Otherwise: detect if text = "ArtistTitle"
+        // by checking if the slug matches only the artist portion (artist-only shows have no title)
+        let finalArtist = artist;
+        let finalTitle = title || withoutLocation;
+
+        // Extra check: if title looks like it's just the exhibition subtitle (artist name = whole slug)
+        const fullNorm = normalize(withoutLocation);
+        const slugNorm = normalize(slugBase);
+        if (!artist && fullNorm.startsWith(slugNorm) && slugNorm.length >= 4) {
+          // The slug covers only part of the text → remaining is the exhibition title
+          const artistPartLen = slugNorm.length;
+          // Reconstruct approximate character count
+          let charCount = 0, idx = 0;
+          for (const ch of withoutLocation) {
+            if (/[a-z0-9]/i.test(ch)) charCount++;
+            idx++;
+            if (charCount >= artistPartLen) break;
+          }
+          finalArtist = withoutLocation.slice(0, idx).trim();
+          finalTitle = withoutLocation.slice(idx).trim() || finalArtist;
+          if (!withoutLocation.slice(idx).trim()) finalArtist = '';
+        }
 
         exhibitions.push({
-          title: title || withoutLocation,
-          artists: artist,
+          title: finalTitle,
+          artists: finalArtist,
           dates,
           location,
         });
@@ -319,14 +368,15 @@ async function scrapePaceGallery() {
       const text = item.text;
       const slug = item.href.split('/').filter(Boolean).pop() || '';
 
-      // Status: "On View", "Upcoming", "Past"
+      // Format: "Artist Name On View Exhibition Title Date Location"
+      // Status badge is always present: "On View", "Upcoming", "Past"
       const statusMatch = text.match(/\s+(On View|Upcoming|Past)\s+/i);
       const artistName = statusMatch ? text.slice(0, statusMatch.index).trim() : '';
       const afterStatus = statusMatch
         ? text.slice((statusMatch.index || 0) + statusMatch[0].length)
         : text;
 
-      // Date range (short month abbrevs or full)
+      // Date range — short or full month names
       const dateMatch = afterStatus.match(
         /([A-Z][a-z]{1,8}\.?\s+\d{1,2}(?:,\s*\d{4})?[\s–\-—]+[A-Z][a-z]{1,8}\.?\s+\d{1,2},?\s*\d{4})/
       );
@@ -338,7 +388,23 @@ async function scrapePaceGallery() {
         /\s+(New York|Los Angeles|London|Paris|Hong Kong|Geneva|Seoul|Palm Beach|[A-Z][a-z]+(?: [A-Z][a-z]+)?)\s*$/
       );
       const location = locationMatch ? locationMatch[1].trim() : '';
-      const titlePart = withoutDates.replace(locationMatch ? locationMatch[0] : '', '').trim();
+      let titlePart = withoutDates.replace(locationMatch ? locationMatch[0] : '', '').trim();
+
+      // If title is suspiciously short (1-2 words), reconstruct from slug
+      // e.g. "David Byrne Stairwell Drawings" slug vs text with only "New" as title
+      if (titlePart.split(' ').length <= 2 && slug.includes('-')) {
+        const slugWords = slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1));
+        const artistNormWords = artistName.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(' ');
+        // Drop the artist words from the slug
+        let slugArtistLen = 0;
+        for (const aw of artistNormWords) {
+          if (slugWords[slugArtistLen]?.toLowerCase() === aw) slugArtistLen++;
+        }
+        const titleFromSlug = slugWords.slice(slugArtistLen).join(' ');
+        if (titleFromSlug && titleFromSlug.length > titlePart.length) {
+          titlePart = titleFromSlug;
+        }
+      }
 
       exhibitions.push({
         title: titlePart || slug.replace(/-/g, ' '),
