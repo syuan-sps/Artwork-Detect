@@ -83,32 +83,56 @@ function splitArtistTitle(combined, slug) {
 }
 
 /**
- * For David Zwirner links the text format is:
- *   "ArtistTitleLocation(Now Open|Coming Soon|Opening DATE): DateLearn More"
- * This function strips all trailing noise and extracts artist, title, dates, location.
+ * Parse a David Zwirner exhibition link text.
+ *
+ * Format: "{ArtistMaybeTitle}{Location}(Now Open|Coming Soon|Opening DATE)[: Date]"
+ * Examples:
+ *   "Flavin, Judd, McCracken, Ryman, SandbackLondonNow Open: March 25—May 22, 2026"
+ *   "Mamma AnderssonŒuvres sur papierParisComing Soon: April 23—June 27, 2026"
+ *   "Statics of an EggNew York: Walker StreetComing Soon: May 8—June 27, 2026"
+ *   "Steven ShearerLondonOpening June 5, 2026"
  */
 function parseDavidZwirnerLink(rawText, slug) {
-  // Strip "Learn More" at end
   let text = rawText.replace(/Learn More\s*$/i, '').trim();
 
-  // Strip status + date suffix: "Now Open: DATE", "Coming Soon: DATE", "Opening DATE:"
-  // Keep everything before the status marker
-  const statusIdx = text.search(/(Now Open|Coming Soon|Opening [A-Z][a-z])[:\s]/i);
-  let beforeStatus = statusIdx > 0 ? text.slice(0, statusIdx).trim() : text;
-
-  // Extract date range from the full text (it may appear after status)
+  // 1. Extract date range (may appear anywhere)
   const dateMatch = text.match(/([A-Z][a-z]+ \d{1,2}[—–\-][A-Z]?[a-z]* ?\d{1,2},?\s*\d{4})/);
   const dates = dateMatch ? dateMatch[1] : '';
 
-  // Location at end of beforeStatus — known city/address patterns
-  const locationMatch = beforeStatus.match(
-    /(New York(?:[:\s]*(?:19th|20th|Walker|69th|21st|25th)[^\w]*Street)?|Los Angeles|London|Paris|Hong Kong|Berlin|Seoul|Brussels)\s*$/i
-  );
-  const location = locationMatch ? locationMatch[1].replace(/\s+/g, ' ').trim() : '';
-  const titleBlock = beforeStatus.replace(locationMatch ? locationMatch[0] : '', '').trim();
+  // 2. Find cutoff point: earliest of (status marker) or (date position)
+  //    Everything from the cutoff onwards is noise.
+  const statusRe = /\s*(Now Open|Coming Soon|Opening (?:May|June|July|Aug|Sep|Oct|Nov|Dec|Jan|Feb|Mar|Apr)\s+\d)/i;
+  const statusIdx = text.search(statusRe);
+  const dateIdx = dates ? text.indexOf(dates) : -1;
 
-  const { artist, title } = splitArtistTitle(titleBlock, slug);
-  return { artist, title: title || titleBlock, dates, location };
+  let cutoff = text.length;
+  if (statusIdx > 0) cutoff = Math.min(cutoff, statusIdx);
+  if (dateIdx > 0) cutoff = Math.min(cutoff, dateIdx);
+
+  const core = text.slice(0, cutoff).trim();
+
+  // 3. Strip known DZ location — it appears after the artist/title block.
+  //    Patterns: "New York: 20th Street", "New York: Walker Street", city names.
+  //    Strategy: find the FIRST occurrence of a known location and cut there.
+  const locationRe = /\s*(New York(?:[:\s]+(?:\d+(?:th|st|nd|rd)|Walker|Park|69th)[^A-Z]*)?|Los Angeles|London|Paris|Hong Kong|Brussels|Berlin|Seoul|Geneva)\s*/i;
+  const locMatch = core.match(locationRe);
+  let location = '';
+  let artistTitle = core;
+  if (locMatch) {
+    const locIdx = core.indexOf(locMatch[0]);
+    location = locMatch[1].trim();
+    artistTitle = core.slice(0, locIdx).trim();
+  }
+
+  // 4. Split artist from title using slug
+  const { artist, title } = splitArtistTitle(artistTitle, slug);
+
+  // 5. Post-process splits where the "title" is clearly just a trailing fragment
+  //    of the artist name (1 short word, starts with lowercase or is a surname fragment)
+  let finalArtist = artist;
+  let finalTitle = (title || artistTitle).replace(/^[,\s]+/, '').trim();
+
+  return { artist: finalArtist, title: finalTitle || finalArtist, dates, location };
 }
 
 /**
@@ -275,53 +299,37 @@ async function scrapePaulaCooper() {
         const text = item.text;
         const slug = item.href.split('/').pop() || '';
 
-        // Date range
+        // 1. Date range
         const dateMatch = text.match(
           /([A-Z][a-z]+ \d{1,2}(?:,?\s*\d{4})?[\s–\-—]+[A-Z][a-z]+ \d{1,2},?\s*\d{4})/
         );
         const dates = dateMatch ? dateMatch[0] : '';
-        const withoutDates = text.replace(dates, '').trim();
 
-        // Street address — remove so it doesn't pollute the title
-        const locationMatch = withoutDates.match(
-          /(\d+\s+(?:West|East|North|South)\s+[\w\s]+(?:Street|Avenue|Ave|St)|(?:534|521|529|314)\s+(?:West|East)[\s\w]+|Lever House[^,]*)/i
-        );
-        const location = locationMatch ? locationMatch[1].trim() : '';
-        const withoutLocation = withoutDates.replace(locationMatch ? locationMatch[0] : '', '').trim();
+        // 2. Truncate at date — everything after the date is description text
+        let core = dates ? text.slice(0, text.indexOf(dates)).trim() : text.trim();
 
-        // Paula Cooper slugs are usually just artist-name (e.g. "ralph-lemon", "sol-lewitt5")
-        // Try slug-based split; if the entire text normalizes to the artist slug, treat as artist-only show
-        const slugBase = slug.replace(/\d+$/, ''); // strip trailing version numbers
-        const { artist, title } = splitArtistTitle(withoutLocation, slugBase);
+        // 3. Strip street addresses from core — handles both full and abbreviated forms
+        //    e.g. "534 West 21st Street", "521 W 21st Street", "Lever House390 Park Ave", "390 Park Ave"
+        //    Also strips known venue names like "Lever House"
+        const addressRe = /\s*(?:Lever House[^A-Z]*|(?:\d+\s+(?:West|East|W|E)\s+[\w\s]+(?:Street|Ave(?:nue)?|St)|[\w\s]+,\s*(?:New York|Shanghai|Palm Beach|NY|FL)[^A-Z]*))/gi;
+        core = core.replace(addressRe, ' ').replace(/\s{2,}/g, ' ').trim();
 
-        // If artist captured and title is left, great. Otherwise: detect if text = "ArtistTitle"
-        // by checking if the slug matches only the artist portion (artist-only shows have no title)
-        let finalArtist = artist;
-        let finalTitle = title || withoutLocation;
+        // Also strip bare "New York, NY 10022"-style zip fragments
+        core = core.replace(/,?\s*(?:New York,?\s*NY\s*\d{5}|NY\s*\d{5})/gi, '').trim();
 
-        // Extra check: if title looks like it's just the exhibition subtitle (artist name = whole slug)
-        const fullNorm = normalize(withoutLocation);
-        const slugNorm = normalize(slugBase);
-        if (!artist && fullNorm.startsWith(slugNorm) && slugNorm.length >= 4) {
-          // The slug covers only part of the text → remaining is the exhibition title
-          const artistPartLen = slugNorm.length;
-          // Reconstruct approximate character count
-          let charCount = 0, idx = 0;
-          for (const ch of withoutLocation) {
-            if (/[a-z0-9]/i.test(ch)) charCount++;
-            idx++;
-            if (charCount >= artistPartLen) break;
-          }
-          finalArtist = withoutLocation.slice(0, idx).trim();
-          finalTitle = withoutLocation.slice(idx).trim() || finalArtist;
-          if (!withoutLocation.slice(idx).trim()) finalArtist = '';
-        }
+        // 4. Split artist / title using slug
+        const slugBase = slug.replace(/\d+$/, '');
+        const { artist, title } = splitArtistTitle(core, slugBase);
+
+        // 5. If no split found (artist-only or group show slug), use full core as title
+        const finalArtist = artist || '';
+        const finalTitle = (title || core).replace(/^[,\s]+/, '').trim();
 
         exhibitions.push({
-          title: finalTitle,
+          title: finalTitle || slugBase.replace(/-/g, ' '),
           artists: finalArtist,
           dates,
-          location,
+          location: '',
         });
       }
 
@@ -665,14 +673,34 @@ async function scrapeGallery(galleryConfig) {
     exhibitions = await scrapeUniversal(galleryConfig);
   }
 
-  // Deduplicate and clean
+  // Post-process: clean all exhibitions
+  const cleaned = exhibitions.map((ex) => ({
+    ...ex,
+    title: cleanField(ex.title),
+    artists: cleanField(ex.artists),
+  }));
+
+  // Deduplicate by title
   const seen = new Set();
-  return exhibitions.filter((ex) => {
+  return cleaned.filter((ex) => {
     const key = (ex.title || '').trim().toLowerCase();
-    if (!key || key.length < 3 || seen.has(key)) return false;
+    if (!key || key.length < 2 || seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+}
+
+/**
+ * General field cleanup: strip leading/trailing commas, extra whitespace,
+ * stray punctuation that commonly appears from parsing artifacts.
+ */
+function cleanField(s) {
+  if (!s) return '';
+  return s
+    .replace(/^[,;\s]+/, '')   // leading comma/semicolon/space
+    .replace(/[,;\s]+$/, '')   // trailing comma/semicolon/space
+    .replace(/\s{2,}/g, ' ')   // multiple spaces
+    .trim();
 }
 
 module.exports = { scrapeGallery };
