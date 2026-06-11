@@ -533,10 +533,11 @@ async function scrapeUniversal(galleryConfig) {
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
 
         // Strategy 1: links to individual exhibition pages
+        // Also matches /exhibit/ (used by Gladstone Gallery)
         raw = await page.evaluate(() => {
           const items = [];
           document
-            .querySelectorAll('a[href*="exhibition"], a[href*="show"], a[href*="program"]')
+            .querySelectorAll('a[href*="exhibition"], a[href*="exhibit/"], a[href*="show"], a[href*="program"]')
             .forEach((el) => {
               const href = el.href;
               const text = el.textContent.trim().replace(/\s+/g, ' ');
@@ -561,12 +562,17 @@ async function scrapeUniversal(galleryConfig) {
             );
             candidates.forEach((el) => {
               const text = el.textContent.trim().replace(/\s+/g, ' ');
-              // Must contain a date-like pattern and be substantial
+              // Must contain a date range pattern (month + year), not just a zip/address/phone
+              // Exclude contact/address blocks: those have phone numbers or zip codes
+              const hasDateRange = text.match(/[A-Z][a-z]{1,8}\.?\s+\d{1,2}[,\s]*(?:\d{4})?[\s–\-—]+[A-Z][a-z]{1,8}\.?\s+\d{1,2}[,\s]*\d{4}/);
               if (
                 text.length > 20 &&
                 text.length < 500 &&
-                text.match(/\d{4}/) &&
-                !text.match(/^(Exhibitions|Artists|Archive|Filter|Past|Current|Upcoming)$/i)
+                hasDateRange &&
+                !text.match(/^(Exhibitions|Artists|Archive|Filter|Past|Current|Upcoming)$/i) &&
+                !text.match(/\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b/) && // phone number
+                !text.match(/\bNY\s+\d{5}\b/) && // zip code
+                !text.match(/(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i) // hours listing
               ) {
                 // Use only the direct text, not nested containers (avoid duplicates)
                 const directText = [...el.childNodes]
@@ -609,18 +615,33 @@ async function scrapeUniversal(galleryConfig) {
     }
 
     for (const item of raw) {
-      const text = item.text;
+      // Strip "Learn More" suffix and long description paragraphs that some
+      // galleries (e.g. Tina Kim) embed in their link text
+      let text = item.text
+        .replace(/\s*Learn More\s*$/i, '')
+        .trim();
+      // If text contains a gallery name + "is pleased to announce" or "is honored to"
+      // (description text), truncate before it
+      const descIdx = text.search(/\s+(?:is pleased to|is honored to|announces|presents)\b/i);
+      if (descIdx > 20) text = text.slice(0, descIdx).trim();
+
       const slug = (item.href || '').split('/').filter(Boolean).pop() || '';
 
-      // Date range — also handles "through April 25, 2026" (single endpoint)
+      // Date range — handles multiple formats including:
+      //   "March 26–May 2, 2026"  "Mar 12 – Apr 25, 2026"
+      //   "30 Apr - 20 Jun 2026"  "20 Nov 2025 - 24 Jan 2026"  (D Mon YYYY)
+      //   "through April 25, 2026"
       const dateMatch =
         text.match(
           /([A-Z][a-z]{1,8}\.?\s+\d{1,2}(?:,?\s*\d{4})?[\s–\-—]+[A-Z][a-z]{1,8}\.?\s+\d{1,2},?\s*\d{4})/
         ) ||
         text.match(/((?:through|Through|thru)\s+[A-Z][a-z]{1,8}\.?\s+\d{1,2},?\s*\d{4})/) ||
-        text.match(/([A-Z][a-z]{1,8}\.?\s+\d{1,2},?\s*\d{4}\s*–\s*[A-Z][a-z]{1,8}\.?\s+\d{1,2},?\s*\d{4})/);
+        text.match(/([A-Z][a-z]{1,8}\.?\s+\d{1,2},?\s*\d{4}\s*–\s*[A-Z][a-z]{1,8}\.?\s+\d{1,2},?\s*\d{4})/) ||
+        text.match(/(\d{1,2}\s+[A-Z][a-z]{2,8}\.?\s*[-–—]\s*\d{1,2}\s+[A-Z][a-z]{2,8}\.?\s*,?\s*\d{4})/);
       const dates = dateMatch ? dateMatch[0] : '';
-      const withoutDates = text.replace(dates, '').trim();
+      // Truncate text at date — everything after is description/noise for most sites
+      const textBeforeDate = dates ? text.slice(0, text.indexOf(dates)).trim() : text;
+      const withoutDates = (textBeforeDate || text.replace(dates, '')).trim();
 
       // Known location patterns
       const locationMatch = withoutDates.match(
@@ -649,6 +670,54 @@ async function scrapeUniversal(galleryConfig) {
   return exhibitions;
 }
 
+// ─── Gladstone Gallery ────────────────────────────────────────────────────────
+// Gladstone's listing page is image-only; derive artist/title from URL slugs.
+// Slug format: "artist-name-exhibition-title-locationcode+year"
+// e.g. "gustav-klimt-women-bgg26", "celia-paul-innervisions", "rachel-rose-the-rest"
+async function scrapeGladstone() {
+  const exhibitions = [];
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage();
+    await page.setUserAgent(UA);
+    await page.goto('https://gladstonegallery.com/exhibitions', {
+      waitUntil: 'networkidle2',
+      timeout: 25000,
+    });
+    const hrefs = await page.evaluate(() =>
+      [...document.querySelectorAll('a[href*="/exhibit/"]')]
+        .map((a) => a.href)
+        .filter((h, i, arr) => arr.indexOf(h) === i)
+    );
+
+    for (const href of hrefs.slice(0, 40)) {
+      // Slug: last path segment, strip trailing slash
+      const slug = href.replace(/\/$/, '').split('/').pop() || '';
+      // Strip trailing location+year code: "-bgg26", "-bxl26", "-ny26", "-la26", "-seoul26" etc.
+      const cleanSlug = slug.replace(/-[a-z]{2,6}\d{2,4}$/, '');
+      // Convert kebab segments to title-case words
+      const slugWords = cleanSlug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+
+      // Artist names are typically 2 words (first + last).
+      // Treat the first 2 slug words as artist, remainder as title.
+      // Exception: if the slug has only 1-2 words total, treat entire thing as title (group show).
+      let artists = '';
+      let title = slugWords.join(' ');
+      if (slugWords.length >= 3) {
+        artists = slugWords.slice(0, 2).join(' ');
+        title = slugWords.slice(2).join(' ');
+      }
+
+      exhibitions.push({ title, artists, dates: '', location: '' });
+    }
+  } catch (err) {
+    console.error('Gladstone scrape error:', err.message);
+  } finally {
+    await browser.close();
+  }
+  return exhibitions;
+}
+
 // ─── Main entry ───────────────────────────────────────────────────────────────
 
 async function scrapeGallery(galleryConfig) {
@@ -666,6 +735,8 @@ async function scrapeGallery(galleryConfig) {
     exhibitions = await scrapeHauserWirth();
   } else if (name.includes('pace gallery') || name === 'pace') {
     exhibitions = await scrapePaceGallery();
+  } else if (name.includes('gladstone')) {
+    exhibitions = await scrapeGladstone();
   }
 
   // All standard galleries use the universal scraper
@@ -678,7 +749,13 @@ async function scrapeGallery(galleryConfig) {
     ...ex,
     title: cleanField(ex.title),
     artists: cleanField(ex.artists),
-  }));
+  })).filter((ex) => {
+    // Drop entries that are clearly events or non-exhibition entries
+    const t = (ex.title || '').trim();
+    if (/^Opening\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(t)) return false;
+    if (/^404/.test(t)) return false;
+    return true;
+  });
 
   // Deduplicate by title
   const seen = new Set();

@@ -76,13 +76,13 @@ const GALLERIES = {
   },
   'gladstone gallery': {
     name: 'Gladstone Gallery',
-    url: 'https://www.gladstonegallery.com',
+    url: 'https://gladstonegallery.com',
     exhibitionsPath: '/exhibitions',
     tier: 'standard',
   },
   gladstone: {
     name: 'Gladstone Gallery',
-    url: 'https://www.gladstonegallery.com',
+    url: 'https://gladstonegallery.com',
     exhibitionsPath: '/exhibitions',
     tier: 'standard',
   },
@@ -274,7 +274,7 @@ const GALLERIES = {
   },
   'barbara gladstone': {
     name: 'Gladstone Gallery',
-    url: 'https://www.gladstonegallery.com',
+    url: 'https://gladstonegallery.com',
     exhibitionsPath: '/exhibitions',
     tier: 'standard',
   },
@@ -1880,13 +1880,13 @@ const GALLERIES = {
   },
   'laurence miller gallery': {
     name: 'Laurence Miller Gallery',
-    url: 'http://www.laurencemillergallery.com',
+    url: 'https://www.laurencemillergallery.com',
     exhibitionsPath: '/exhibitions',
     tier: 'standard',
   },
   'laurence miller': {
     name: 'Laurence Miller Gallery',
-    url: 'http://www.laurencemillergallery.com',
+    url: 'https://www.laurencemillergallery.com',
     exhibitionsPath: '/exhibitions',
     tier: 'standard',
   },

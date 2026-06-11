@@ -46,7 +46,7 @@ The frontend proxies API requests to `http://localhost:3001`.
 - **Stateless** — no database. Every search triggers a live scrape + AI synthesis.
 - **Gallery-specific scrapers** for each of the 5 galleries, with a universal fallback.
 - **Puppeteer fallback** — if Cheerio (static fetch) fails, automatically retries with headless Chrome.
-- **Claude synthesis** — scraped exhibitions are fed to `claude-sonnet-4-5` which returns a structured JSON curatorial profile.
+- **Claude synthesis** — scraped exhibitions are fed to `claude-sonnet-4-6` which returns a structured JSON curatorial profile.
 
 ## Environment Variables
 
