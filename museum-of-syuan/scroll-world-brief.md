@@ -1,8 +1,10 @@
 # Museum of Syuan Scroll World Brief
 
 This is the Scroll World intake and generation plan for the desktop-only portfolio museum.
-The page is wired through `mountScrollWorld(...)`; current stills are SVG placeholders in
-`script.js` until Higgsfield stills and camera clips are generated.
+The page is wired through `mountScrollWorld(...)`; current stills are generated reference
+style assets, and current clips are lightweight desktop scrub previews created from those
+stills. Replace the preview clips with Higgsfield camera clips for the final production
+Scroll World.
 
 ## Intake
 
@@ -96,7 +98,7 @@ Use `--start-image` from the actual last frame of the previous rendered dive and
 
 ## Asset slots
 
-After Higgsfield generation, update `script.js`:
+Current preview assets already occupy these slots:
 
 - `sections[0].still` -> `assets/stills/entrance.webp`
 - `sections[0].clip` -> `assets/vid/entrance.mp4`
@@ -108,9 +110,12 @@ After Higgsfield generation, update `script.js`:
 - `sections[3].clip` -> `assets/vid/gift-shop.mp4`
 - `sections[4].still` -> `assets/stills/aerial.webp`
 - `sections[4].clip` -> `assets/vid/aerial.mp4`
-- `connectors` -> four encoded connector clips in order.
+- `connectors` -> currently empty for the preview build. After Higgsfield generation,
+  add four encoded connector clips in order.
 
 ## Environment note
 
-`higgsfield` is not currently installed on this machine, so this commit wires the real
-Scroll World engine and generation plan but cannot render final AI clips here yet.
+`higgsfield` was installed user-locally, but this machine is not authenticated with
+Higgsfield. Final AI camera clips require `higgsfield auth login`, a selected workspace,
+and credits. The current MP4s are still-based preview clips so the engine can be tested
+end-to-end before replacing them with generated dives/connectors.
