@@ -16,14 +16,25 @@ const setActiveRoom = (id) => {
 };
 
 const updateActiveRoom = () => {
-  const viewportCenter = window.scrollY + window.innerHeight * 0.5;
-  const active = sections.reduce((nearest, section) => {
-    const center = section.offsetTop + section.offsetHeight * 0.5;
-    const distance = Math.abs(center - viewportCenter);
-    return distance < nearest.distance ? { id: section.id, distance } : nearest;
-  }, { id: sections[0]?.id, distance: Number.POSITIVE_INFINITY });
+  const active = sections.reduce((largest, section) => {
+    const rect = section.getBoundingClientRect();
+    const visible = Math.max(0, Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0));
+    return visible > largest.visible ? { id: section.id, visible } : largest;
+  }, { id: sections[0]?.id, visible: 0 });
 
   if (active.id) setActiveRoom(active.id);
+};
+
+let pendingFrame = false;
+
+const scheduleUiUpdate = () => {
+  if (pendingFrame) return;
+  pendingFrame = true;
+  requestAnimationFrame(() => {
+    pendingFrame = false;
+    updateScrollVariable();
+    updateActiveRoom();
+  });
 };
 
 routeLinks.forEach((link) => {
@@ -33,13 +44,7 @@ routeLinks.forEach((link) => {
   });
 });
 
-window.addEventListener("scroll", () => {
-  updateScrollVariable();
-  updateActiveRoom();
-}, { passive: true });
-window.addEventListener("resize", () => {
-  updateScrollVariable();
-  updateActiveRoom();
-});
+window.addEventListener("scroll", scheduleUiUpdate, { passive: true });
+window.addEventListener("resize", scheduleUiUpdate);
 updateScrollVariable();
 updateActiveRoom();
