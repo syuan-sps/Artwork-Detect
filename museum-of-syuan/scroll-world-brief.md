@@ -1,10 +1,9 @@
 # Museum of Syuan Scroll World Brief
 
-This is the Scroll World intake and generation plan for the desktop-only portfolio museum.
-The page is wired through `mountScrollWorld(...)`; current stills are generated reference
-style assets, and current clips are lightweight desktop scrub previews created from those
-stills. Replace the preview clips with Higgsfield camera clips for the final production
-Scroll World.
+This is the no-Higgsfield Scroll World brief for the desktop-only portfolio museum.
+The page is wired through `mountScrollWorld(...)`; stills are generated reference-style
+assets, and clips are lightweight desktop scrub videos created from those stills with
+`ffmpeg`. This keeps the Scroll World interaction without requiring Higgsfield access.
 
 ## Intake
 
@@ -16,8 +15,8 @@ Scroll World.
 - Art direction: reference-style isometric collectible miniature museum with Western
   columns, black Taiwanese tiled roofs, stone courtyard, ticket kiosk, gift shop, lanterns,
   benches, trees, fountain, and restrained yellow lighting.
-- Camera architecture: Scroll World architecture B, dive-in + aerial connector between
-  miniature rooms.
+- Camera architecture: generated still sequence with scroll-scrubbed preview clips and
+  crossfades between rooms.
 - Mobile: desktop only.
 
 ## Style preamble
@@ -72,50 +71,45 @@ Subject: A final aerial view of the entire Museum of Syuan island: entrance hall
 ticketing kiosk, galleries, gift shop, fountain, bridge, lanterns, trees, and all paths
 connected in one clear portfolio map. This is the contact CTA and full-museum overview.
 
-## Dive clip prompt template
+## Preview clip approach
 
-Use one per scene, with `--start-image` set to the matching scene still:
+Each room has:
 
-> Single continuous cinematic camera move, no cuts. Begin high and far, looking down at
-> the whole [SCENE] from outside like a tiny refined toy museum model. The camera slowly
-> glides forward and descends toward [FOCAL POINT], as if flying inside. As the camera
-> pushes in, the roof and upper structure gently lift and open away to reveal the warm
-> interior. Isometric collectible miniature museum, grayscale stone, black Taiwanese
-> tiled roofs, warm yellow lantern light, polished Nintendo-cute toy model, professional
-> museum quality, smooth graceful slow motion, subtle parallax. No text, no captions.
+- one generated PNG still in `assets/stills/`
+- one 8-second desktop MP4 in `assets/vid/`, created from the still with a subtle zoom
+  so the Scroll World engine can scrub video time
+- no connector clips; room changes use the engine crossfade
 
-## Connector prompt template
+The current clip generation command shape is:
 
-Use `--start-image` from the actual last frame of the previous rendered dive and
-`--end-image` from the actual first frame of the next rendered dive:
-
-> Single continuous camera move, no cuts. The camera smoothly pulls up and back out of
-> [SCENE i], rising into the sky, then glides forward across the connected miniature
-> museum world and arrives above [SCENE i+1], beginning to descend toward it. One
-> connected refined grayscale museum island with Taiwanese tiled roofs, stone courtyard,
-> lanterns, trees, gift shop, ticket kiosk, and fountain. Seamless flowing aerial
-> transition, smooth graceful slow motion. No text, no captions.
+```bash
+ffmpeg -loop 1 -i assets/stills/<name>.png -t 8 \
+  -vf "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='min(zoom+0.00055,1.045)':d=200:s=1920x1080:fps=25,format=yuv420p" \
+  -an -c:v libx264 -preset medium -crf 20 \
+  -g 8 -keyint_min 8 -sc_threshold 0 -movflags +faststart \
+  assets/vid/<name>.mp4
+```
 
 ## Asset slots
 
-Current preview assets already occupy these slots:
+Current assets occupy these slots:
 
-- `sections[0].still` -> `assets/stills/entrance.webp`
+- `sections[0].still` -> `assets/stills/entrance.png`
 - `sections[0].clip` -> `assets/vid/entrance.mp4`
-- `sections[1].still` -> `assets/stills/ticketing.webp`
+- `sections[1].still` -> `assets/stills/ticketing.png`
 - `sections[1].clip` -> `assets/vid/ticketing.mp4`
-- `sections[2].still` -> `assets/stills/galleries.webp`
+- `sections[2].still` -> `assets/stills/galleries.png`
 - `sections[2].clip` -> `assets/vid/galleries.mp4`
-- `sections[3].still` -> `assets/stills/gift-shop.webp`
+- `sections[3].still` -> `assets/stills/gift-shop.png`
 - `sections[3].clip` -> `assets/vid/gift-shop.mp4`
-- `sections[4].still` -> `assets/stills/aerial.webp`
+- `sections[4].still` -> `assets/stills/aerial.png`
 - `sections[4].clip` -> `assets/vid/aerial.mp4`
-- `connectors` -> currently empty for the preview build. After Higgsfield generation,
-  add four encoded connector clips in order.
+- `connectors` -> intentionally empty for the no-Higgsfield build.
 
-## Environment note
+## Next iteration ideas
 
-`higgsfield` was installed user-locally, but this machine is not authenticated with
-Higgsfield. Final AI camera clips require `higgsfield auth login`, a selected workspace,
-and credits. The current MP4s are still-based preview clips so the engine can be tested
-end-to-end before replacing them with generated dives/connectors.
+- Regenerate any still whose room content should be more specific.
+- Add more pronounced Ken Burns motion per room by adjusting the `zoompan` expression.
+- Add handcrafted connector stills if you want transitional “map view” beats without
+  external video generation.
+- Integrate `museum-of-syuan/` into the actual portfolio source repo when available.
