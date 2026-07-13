@@ -13,8 +13,9 @@ assets, and clips are lightweight desktop scrub videos created from those stills
   `#d6d2c8`, dark gray `#343434`, warm yellow light `#d2a82d`.
 - Tone: polished, cutesy miniature, consulting-ready, Taiwan-toned.
 - Copy rule: each room must read as recruiter evidence first (numbers, decisions,
-  trade-offs, transferable skills), then a purposeful Traditional Chinese line.
-  Identity and aesthetics are the brand layer — never a substitute for proof.
+  trade-offs, transferable skills). Keep EN and 中文 as separate single-language
+  views (`?lang=en` / `?lang=zh`); never mix both languages on the same page.
+  Brand name stays `Museum of Syuan` in English in both views.
 - Art direction: reference-style isometric collectible miniature museum with Western
   columns, black Taiwanese tiled roofs, stone courtyard, ticket kiosk, gift shop, lanterns,
   benches, trees, fountain, and restrained yellow lighting.

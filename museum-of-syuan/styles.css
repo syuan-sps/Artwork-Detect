@@ -82,6 +82,52 @@ body {
   font-family: Inter, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
 }
 
+html[data-lang="zh"] .sw-root,
+html[data-lang="zh"] .sw-root .sw-copy__title,
+html[data-lang="zh"] .sw-root .sw-copy__body,
+html[data-lang="zh"] .sw-root .sw-copy__tags li,
+html[data-lang="zh"] .sw-root .sw-nav__item,
+html[data-lang="zh"] .sw-root .sw-route__label,
+html[data-lang="zh"] .sw-root .sw-hint,
+html[data-lang="zh"] .sw-root .sw-btn,
+html[data-lang="zh"] .sw-root .sw-topcta {
+  font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+}
+
+.lang-switch {
+  position: fixed;
+  top: clamp(14px, 2.4vw, 26px);
+  left: clamp(10.5rem, 16vw, 14.5rem);
+  right: auto;
+  z-index: 70;
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.28rem;
+  border: 1px solid rgba(21, 21, 21, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 12px 36px rgba(21, 21, 21, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.lang-switch button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #5d5b56;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0.55rem 0.8rem;
+}
+
+.lang-switch button.is-active {
+  background: #151515;
+  color: #fff;
+}
+
 .sw-root .sw-scene__still {
   object-fit: contain;
   object-position: center;
@@ -104,6 +150,16 @@ body {
 }
 
 @media (max-width: 860px) {
+  .lang-switch {
+    left: auto;
+    right: 0.75rem;
+    top: 0.75rem;
+  }
+
+  .sw-root .sw-topcta {
+    display: none;
+  }
+
   .sw-root .sw-copy {
     left: clamp(18px, 5vw, 64px) !important;
     right: clamp(18px, 5vw, 64px) !important;
