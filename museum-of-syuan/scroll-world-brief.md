@@ -12,10 +12,11 @@ assets, and clips are lightweight desktop scrub videos created from those stills
 - Palette: white `#ffffff`, warm museum paper `#f7f6f1`, black `#151515`, gray stone
   `#d6d2c8`, dark gray `#343434`, warm yellow light `#d2a82d`.
 - Tone: polished, cutesy miniature, consulting-ready, Taiwan-toned.
-- Copy rule: each room must read as recruiter evidence first (numbers, decisions,
-  trade-offs, transferable skills). Keep EN and 中文 as separate single-language
-  views (`?lang=en` / `?lang=zh`); never mix both languages on the same page.
-  Brand name stays `Museum of Syuan` in English in both views.
+- Copy rule: each room leads with evidence and transferable skills, written for a
+  holistic applicant profile across consulting, finance, product, and museum roles.
+  Keep EN and 中文 as separate single-language views (`?lang=en` / `?lang=zh`);
+  never mix both languages on the same page. Brand name stays `Museum of Syuan`
+  in English in both views. No em dashes. No email or LinkedIn CTAs on the page.
 - Art direction: reference-style isometric collectible miniature museum with Western
   columns, black Taiwanese tiled roofs, stone courtyard, ticket kiosk, gift shop, lanterns,
   benches, trees, fountain, and restrained yellow lighting.
@@ -110,15 +111,15 @@ Current assets occupy these slots:
 - `sections[4].clip` -> `assets/vid/aerial.mp4`
 - `connectors` -> intentionally empty for the no-Higgsfield build.
 
-## Consulting positioning (copy map)
+## Positioning map (cross-industry)
 
 | Room | Recruiter read | Proof to keep visible |
 |------|----------------|-----------------------|
-| Entrance | Distinctive lens, not soft branding | Quant + qual frame; bilingual comparative judgment |
+| Entrance | Distinctive lens across sectors | Quant + qual; markets, institutions, culture |
 | Ticketing | Methods readiness | CFA L1, Bloomberg, 4 languages, Columbia Econ + Art History |
 | Galleries | Evidence rooms | 1,130 artworks; 570K+ records; 60+ sources; TSA / NGO / PTK scale |
-| Gift Shop | Monday-morning transferables | Reconciliation, stakeholder ops, synthesis under ambiguity |
-| Aerial | Brand layer → case conversation | Range with one through-line; contact CTA |
+| Gift Shop | Transferables for any team | Reconciliation, stakeholder ops, synthesis under ambiguity |
+| Aerial | Holistic through-line | Range without losing focus; no contact CTAs on page |
 
 ## Next iteration ideas
 
@@ -127,4 +128,4 @@ Current assets occupy these slots:
 - Add handcrafted connector stills if you want transitional “map view” beats without
   external video generation.
 - Integrate `museum-of-syuan/` into the actual portfolio source repo when available.
-- Link each gallery tag to a one-page case-style writeup (problem → approach → so what).
+- Link each gallery tag to a one-page writeup (problem, approach, so what).
