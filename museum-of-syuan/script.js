@@ -80,3 +80,27 @@ mountScrollWorld(document.getElementById("world"), {
   ],
   connectors: [],
 });
+
+function stabilizeActiveCopy() {
+  requestAnimationFrame(() => {
+    const navItems = [...document.querySelectorAll(".sw-nav__item")];
+    const copies = [...document.querySelectorAll(".sw-copy")];
+    let activeIndex = navItems.findIndex((item) => item.classList.contains("is-active"));
+    if (activeIndex < 0) activeIndex = 0;
+
+    copies.forEach((copy, index) => {
+      const active = index === activeIndex;
+      copy.style.opacity = active ? "1" : "0";
+      copy.style.transform = window.matchMedia("(max-width: 860px)").matches ? "none" : "translateY(-50%)";
+      copy.style.pointerEvents = active ? "auto" : "none";
+    });
+  });
+}
+
+window.addEventListener("scroll", stabilizeActiveCopy, { passive: true });
+window.addEventListener("resize", stabilizeActiveCopy);
+window.addEventListener("load", stabilizeActiveCopy);
+document.addEventListener("click", (event) => {
+  if (event.target.closest(".sw-nav__item, .sw-route__dot")) stabilizeActiveCopy();
+});
+stabilizeActiveCopy();
