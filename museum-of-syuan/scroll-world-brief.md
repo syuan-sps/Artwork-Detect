@@ -12,6 +12,8 @@ assets, and clips are lightweight desktop scrub videos created from those stills
 - Palette: white `#ffffff`, warm museum paper `#f7f6f1`, black `#151515`, gray stone
   `#d6d2c8`, dark gray `#343434`, warm yellow light `#d2a82d`.
 - Tone: polished, cutesy miniature, consulting-ready, Taiwan-toned.
+- Type: English uses Fraunces (display) + Source Sans 3 (body). Traditional Chinese
+  uses Noto Serif TC (display) + Noto Sans TC (body). Brand lockup stays Fraunces.
 - Copy rule: each room leads with evidence and transferable skills, written for a
   holistic applicant profile across consulting, finance, product, and museum roles.
   Keep EN and 中文 as separate single-language views (`?lang=en` / `?lang=zh`);
